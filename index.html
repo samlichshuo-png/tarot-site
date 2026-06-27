@@ -1,0 +1,1692 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>星幕塔罗</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0d1116;
+      --panel: rgba(18, 24, 31, 0.84);
+      --panel-strong: rgba(23, 31, 40, 0.96);
+      --line: rgba(236, 214, 151, 0.22);
+      --text: #f3ead8;
+      --muted: #b7ad9c;
+      --gold: #e3c879;
+      --teal: #68d5c6;
+      --rose: #d985a2;
+      --ink: #171b22;
+      --shadow: rgba(0, 0, 0, 0.34);
+      --card-w: clamp(164px, 17vw, 188px);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      min-height: 100%;
+      background: var(--bg);
+    }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 15% 18%, rgba(104, 213, 198, 0.16), transparent 28rem),
+        radial-gradient(circle at 84% 10%, rgba(217, 133, 162, 0.13), transparent 24rem),
+        linear-gradient(135deg, rgba(227, 200, 121, 0.08), transparent 28rem),
+        #0d1116;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        radial-gradient(circle, rgba(243, 234, 216, 0.5) 0 1px, transparent 1.6px),
+        linear-gradient(115deg, transparent 0 46%, rgba(227, 200, 121, 0.08) 47%, transparent 48% 100%);
+      background-size: 92px 92px, 100% 100%;
+      opacity: 0.28;
+      mask-image: linear-gradient(to bottom, #000, transparent 82%);
+    }
+
+    .sky-canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      opacity: 0.68;
+      mix-blend-mode: screen;
+    }
+
+    .cursor-aura {
+      position: fixed;
+      left: var(--aura-x, -240px);
+      top: var(--aura-y, -240px);
+      z-index: 1;
+      width: 240px;
+      height: 240px;
+      border-radius: 50%;
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+      background:
+        radial-gradient(circle, rgba(104, 213, 198, 0.18), transparent 34%),
+        radial-gradient(circle, rgba(227, 200, 121, 0.14), transparent 56%);
+      filter: blur(4px);
+      opacity: 0;
+      transition: opacity 220ms ease;
+    }
+
+    body.has-pointer .cursor-aura {
+      opacity: 1;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    .shell {
+      position: relative;
+      z-index: 2;
+      width: min(1160px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 32px 0 24px;
+    }
+
+    .app-grid {
+      display: grid;
+      grid-template-columns: minmax(280px, 0.82fr) minmax(320px, 1.18fr);
+      gap: 20px;
+      align-items: start;
+    }
+
+    .intro,
+    .reading-panel,
+    .result-panel {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: 0 24px 70px var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+
+    .intro::after,
+    .reading-panel::after,
+    .result-panel::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      pointer-events: none;
+      background: linear-gradient(115deg, transparent 0 38%, rgba(255, 255, 255, 0.08) 48%, transparent 58% 100%);
+      transform: translateX(-130%);
+      opacity: 0;
+    }
+
+    .intro:hover::after,
+    .reading-panel:hover::after,
+    .result-panel.is-visible::after {
+      animation: panelSweep 1200ms ease;
+    }
+
+    body.is-ritual .reading-panel {
+      border-color: rgba(104, 213, 198, 0.48);
+      box-shadow:
+        0 28px 80px rgba(0, 0, 0, 0.44),
+        0 0 52px rgba(104, 213, 198, 0.12);
+    }
+
+    .intro {
+      min-height: calc(100vh - 64px);
+      padding: clamp(20px, 4vw, 38px);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 30px;
+    }
+
+    .brand-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-copy {
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 54px;
+      height: 54px;
+      border: 1px solid rgba(227, 200, 121, 0.45);
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      background:
+        linear-gradient(145deg, rgba(227, 200, 121, 0.16), rgba(104, 213, 198, 0.08)),
+        rgba(255, 255, 255, 0.03);
+      flex: 0 0 auto;
+      animation: markPulse 4.8s ease-in-out infinite;
+    }
+
+    .brand-mark svg {
+      width: 36px;
+      height: 36px;
+      transform-origin: center;
+      animation: sigilDrift 20s linear infinite;
+    }
+
+    .brand-title {
+      margin: 0;
+      font-size: 1.05rem;
+      letter-spacing: 0;
+      color: var(--gold);
+    }
+
+    .brand-headline {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .exclusive-tag {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      max-width: 100%;
+      overflow: hidden;
+      border: 1px solid rgba(227, 200, 121, 0.54);
+      border-radius: 6px;
+      padding: 2px 9px;
+      color: #1b1711;
+      background:
+        linear-gradient(135deg, rgba(255, 246, 203, 0.96), rgba(227, 200, 121, 0.94)),
+        var(--gold);
+      box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.08) inset,
+        0 0 24px rgba(227, 200, 121, 0.18);
+      font-size: 0.76rem;
+      font-weight: 700;
+      white-space: nowrap;
+      animation: exclusivePulse 3.6s ease-in-out infinite;
+    }
+
+    .exclusive-tag::after {
+      content: "";
+      position: absolute;
+      inset: -30% auto -30% -45%;
+      width: 42%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.72), transparent);
+      transform: skewX(-18deg);
+      animation: exclusiveSweep 3.2s ease-in-out infinite;
+    }
+
+    .brand-sub {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2.2rem, 5vw, 4.8rem);
+      line-height: 0.98;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      margin: 18px 0 0;
+      max-width: 34rem;
+      color: #d9cebb;
+      line-height: 1.8;
+      font-size: 1rem;
+    }
+
+    .mode-switch {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      padding: 6px;
+      border: 1px solid rgba(227, 200, 121, 0.2);
+      border-radius: 8px;
+      background: rgba(6, 8, 12, 0.42);
+    }
+
+    .mode-button {
+      min-height: 44px;
+      border: 0;
+      border-radius: 6px;
+      color: var(--muted);
+      background: transparent;
+      transition: background 160ms ease, color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+    }
+
+    .mode-button[aria-selected="true"] {
+      color: var(--ink);
+      background: linear-gradient(135deg, var(--gold), #fff0ba);
+      box-shadow: 0 8px 24px rgba(227, 200, 121, 0.18);
+    }
+
+    .mode-button:focus-visible,
+    .primary-button:focus-visible,
+    .secondary-button:focus-visible,
+    input:focus-visible {
+      outline: 2px solid var(--teal);
+      outline-offset: 3px;
+    }
+
+    .ritual-list {
+      display: grid;
+      gap: 12px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .ritual-list li {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: 10px;
+      align-items: start;
+      color: #d7cab4;
+      line-height: 1.7;
+    }
+
+    .ritual-list span {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(104, 213, 198, 0.35);
+      border-radius: 50%;
+      color: var(--teal);
+      font-size: 0.78rem;
+    }
+
+    .reading-panel {
+      padding: clamp(18px, 3vw, 30px);
+    }
+
+    .control-bar {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .field label {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--gold);
+      font-size: 0.9rem;
+    }
+
+    input {
+      width: 100%;
+      min-height: 46px;
+      border: 1px solid rgba(227, 200, 121, 0.22);
+      border-radius: 8px;
+      padding: 0 14px;
+      color: var(--text);
+      background: rgba(5, 7, 10, 0.55);
+    }
+
+    input::placeholder {
+      color: rgba(183, 173, 156, 0.72);
+    }
+
+    .primary-button,
+    .secondary-button {
+      position: relative;
+      overflow: hidden;
+      min-height: 46px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      padding: 0 16px;
+      white-space: nowrap;
+      transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, opacity 160ms ease;
+    }
+
+    .primary-button::after {
+      content: "";
+      position: absolute;
+      inset: -20% auto -20% -45%;
+      width: 34%;
+      pointer-events: none;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.62), transparent);
+      transform: skewX(-18deg) translateX(-160%);
+    }
+
+    .primary-button:hover::after,
+    .primary-button.is-casting::after {
+      animation: buttonSweep 1050ms ease infinite;
+    }
+
+    .primary-button {
+      color: var(--ink);
+      background: linear-gradient(135deg, var(--gold), #fff1be);
+      box-shadow: 0 12px 28px rgba(227, 200, 121, 0.16);
+    }
+
+    .secondary-button {
+      color: var(--text);
+      border-color: rgba(104, 213, 198, 0.28);
+      background: rgba(104, 213, 198, 0.09);
+    }
+
+    .primary-button:hover,
+    .secondary-button:hover,
+    .mode-button:hover {
+      transform: translateY(-1px);
+    }
+
+    .primary-button:disabled,
+    .secondary-button:disabled {
+      cursor: wait;
+      opacity: 0.64;
+      transform: none;
+    }
+
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+      margin: 18px 0 14px;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .status-row strong {
+      color: var(--teal);
+      font-weight: 500;
+    }
+
+    .spread {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, var(--card-w)));
+      justify-content: center;
+      gap: clamp(12px, 2.5vw, 22px);
+      min-height: 330px;
+      align-items: start;
+    }
+
+    .spread::before {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 51%;
+      width: min(560px, 84%);
+      aspect-ratio: 1;
+      border-radius: 50%;
+      pointer-events: none;
+      background:
+        conic-gradient(from 0deg, transparent, rgba(104, 213, 198, 0.24), transparent 28%, rgba(227, 200, 121, 0.22), transparent 58%, rgba(217, 133, 162, 0.18), transparent),
+        radial-gradient(circle, transparent 0 48%, rgba(227, 200, 121, 0.16) 49%, transparent 51%);
+      opacity: 0.34;
+      transform: translate(-50%, -50%);
+      animation: slowSpin 26s linear infinite;
+    }
+
+    .spread.is-shuffling::before {
+      opacity: 0.72;
+      animation-duration: 5s;
+    }
+
+    .spread.single {
+      grid-template-columns: minmax(0, var(--card-w));
+    }
+
+    .spread.single .tarot-card {
+      width: min(66vw, 210px);
+    }
+
+    .card-slot {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      gap: 10px;
+      justify-items: center;
+      perspective: 900px;
+    }
+
+    .slot-label {
+      color: var(--gold);
+      font-size: 0.9rem;
+    }
+
+    .tarot-card {
+      --tilt-x: 0deg;
+      --tilt-y: 0deg;
+      --lift: 0px;
+      position: relative;
+      width: var(--card-w);
+      aspect-ratio: 2 / 3;
+      transform-style: preserve-3d;
+      transform: translateY(var(--lift)) rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
+      transition: transform 760ms cubic-bezier(0.2, 0.7, 0.2, 1), filter 240ms ease;
+      filter: drop-shadow(0 24px 34px rgba(0, 0, 0, 0.34));
+      will-change: transform, filter;
+    }
+
+    .tarot-card:hover {
+      --lift: -8px;
+      filter:
+        drop-shadow(0 30px 38px rgba(0, 0, 0, 0.4))
+        drop-shadow(0 0 18px rgba(227, 200, 121, 0.18));
+    }
+
+    .tarot-card.is-revealed {
+      transform: translateY(var(--lift)) rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
+    }
+
+    .tarot-card.is-dealing {
+      animation: deal 560ms ease;
+    }
+
+    .spread.is-shuffling .tarot-card {
+      animation: shuffleOrbit 760ms ease-in-out infinite;
+      animation-delay: calc(var(--shuffle-index, 0) * -120ms);
+      filter:
+        drop-shadow(0 28px 42px rgba(0, 0, 0, 0.46))
+        drop-shadow(0 0 24px rgba(104, 213, 198, 0.18));
+    }
+
+    .card-face {
+      position: absolute;
+      inset: 0;
+      border-radius: 8px;
+      overflow: hidden;
+      backface-visibility: hidden;
+      border: 1px solid rgba(227, 200, 121, 0.35);
+      transition: transform 760ms cubic-bezier(0.2, 0.7, 0.2, 1), opacity 260ms ease;
+    }
+
+    .card-back {
+      display: grid;
+      place-items: center;
+      opacity: 1;
+      background:
+        radial-gradient(circle at center, rgba(227, 200, 121, 0.22), transparent 30%),
+        linear-gradient(135deg, rgba(104, 213, 198, 0.18), transparent 42%),
+        linear-gradient(210deg, rgba(217, 133, 162, 0.17), transparent 46%),
+        #131922;
+      background-size: 140% 140%;
+      animation: cardBackGlow 5s ease-in-out infinite;
+    }
+
+    .tarot-card.is-revealed .card-back {
+      opacity: 0;
+      pointer-events: none;
+      transform: rotateY(-180deg);
+    }
+
+    .card-back::before,
+    .card-back::after {
+      content: "";
+      position: absolute;
+      inset: 12px;
+      border: 1px solid rgba(243, 234, 216, 0.22);
+      border-radius: 6px;
+    }
+
+    .card-back::after {
+      inset: 25px;
+      border-color: rgba(104, 213, 198, 0.22);
+      transform: rotate(45deg);
+    }
+
+    .back-sigil {
+      position: relative;
+      width: 52%;
+      aspect-ratio: 1;
+      border: 1px solid rgba(227, 200, 121, 0.44);
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      color: var(--gold);
+      animation: sigilSpin 16s linear infinite;
+    }
+
+    .back-sigil::before {
+      content: "";
+      width: 44%;
+      height: 44%;
+      border: 1px solid rgba(104, 213, 198, 0.58);
+      border-radius: 50%;
+      box-shadow: 0 0 30px rgba(104, 213, 198, 0.18);
+    }
+
+    .card-front {
+      transform: rotateY(180deg);
+      opacity: 0;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      padding: 13px;
+      background:
+        radial-gradient(circle at 50% 36%, rgba(var(--accent-rgb), 0.2), transparent 45%),
+        linear-gradient(180deg, #f3ead8, #d4c4a4);
+      color: #1d1a19;
+      box-shadow: inset 0 0 30px rgba(var(--accent-rgb), 0.18);
+    }
+
+    .tarot-card.is-revealed .card-front {
+      opacity: 1;
+      transform: rotateY(0deg);
+    }
+
+    .card-front.reversed {
+      background:
+        radial-gradient(circle at 50% 36%, rgba(var(--accent-rgb), 0.16), transparent 45%),
+        linear-gradient(180deg, #cab999, #efe2c6);
+    }
+
+    .card-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: rgba(29, 26, 25, 0.78);
+      font-size: 0.76rem;
+    }
+
+    .card-art {
+      align-self: center;
+      width: 100%;
+      aspect-ratio: 1;
+      display: grid;
+      place-items: center;
+    }
+
+    .card-art svg {
+      width: 92%;
+      height: 92%;
+      overflow: visible;
+      filter: drop-shadow(0 8px 12px rgba(29, 26, 25, 0.14));
+    }
+
+    .tarot-card.is-revealed .card-art svg {
+      animation: glyphWake 900ms ease both;
+    }
+
+    .card-name {
+      margin: 0;
+      font-size: clamp(1rem, 1.9vw, 1.35rem);
+      line-height: 1.2;
+      text-align: center;
+    }
+
+    .orientation {
+      margin-top: 6px;
+      text-align: center;
+      color: rgba(29, 26, 25, 0.7);
+      font-size: 0.8rem;
+    }
+
+    .result-panel {
+      margin-top: 18px;
+      padding: clamp(18px, 3vw, 26px);
+    }
+
+    .result-panel.is-visible {
+      animation: resultRise 560ms cubic-bezier(0.18, 0.84, 0.28, 1) both;
+    }
+
+    .result-panel[hidden] {
+      display: none;
+    }
+
+    .result-panel h2 {
+      margin: 0 0 10px;
+      font-size: 1.2rem;
+      letter-spacing: 0;
+    }
+
+    .summary-copy {
+      margin: 0 0 18px;
+      color: #d7cab4;
+      line-height: 1.8;
+    }
+
+    .reading-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .reading-item {
+      border: 1px solid rgba(227, 200, 121, 0.18);
+      border-radius: 8px;
+      padding: 14px;
+      background: rgba(7, 9, 13, 0.35);
+      animation: itemReveal 520ms ease both;
+    }
+
+    .reading-item:nth-child(2) {
+      animation-delay: 80ms;
+    }
+
+    .reading-item:nth-child(3) {
+      animation-delay: 160ms;
+    }
+
+    .spark {
+      position: fixed;
+      left: var(--spark-x);
+      top: var(--spark-y);
+      z-index: 5;
+      width: var(--spark-size, 6px);
+      height: var(--spark-size, 6px);
+      border-radius: 50%;
+      pointer-events: none;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.96), rgba(var(--spark-rgb), 0.84) 45%, transparent 72%);
+      box-shadow: 0 0 18px rgba(var(--spark-rgb), 0.6);
+      transform: translate(-50%, -50%) scale(1);
+      animation: sparkBurst 820ms ease-out forwards;
+    }
+
+    .reading-item h3 {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin: 0 0 8px;
+      font-size: 1rem;
+      letter-spacing: 0;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      border-radius: 6px;
+      padding: 2px 8px;
+      color: #10151a;
+      background: var(--gold);
+      font-size: 0.76rem;
+      font-weight: 600;
+    }
+
+    .keywords {
+      margin: 0 0 8px;
+      color: var(--teal);
+      font-size: 0.9rem;
+    }
+
+    .reading-item p {
+      margin: 0;
+      color: #d9cebb;
+      line-height: 1.75;
+    }
+
+    .reading-item p + p {
+      margin-top: 8px;
+    }
+
+    .disclaimer {
+      margin: 18px 0 0;
+      color: rgba(243, 234, 216, 0.62);
+      line-height: 1.7;
+      font-size: 0.86rem;
+    }
+
+    @keyframes deal {
+      from {
+        opacity: 0;
+        transform: translateY(22px) rotateZ(-3deg);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) rotateZ(0);
+      }
+    }
+
+    @keyframes slowSpin {
+      to {
+        transform: translate(-50%, -50%) rotate(360deg);
+      }
+    }
+
+    @keyframes panelSweep {
+      0% {
+        opacity: 0;
+        transform: translateX(-130%);
+      }
+      30% {
+        opacity: 1;
+      }
+      100% {
+        opacity: 0;
+        transform: translateX(130%);
+      }
+    }
+
+    @keyframes buttonSweep {
+      to {
+        transform: skewX(-18deg) translateX(520%);
+      }
+    }
+
+    @keyframes markPulse {
+      0%, 100% {
+        box-shadow: 0 0 0 rgba(227, 200, 121, 0);
+      }
+      50% {
+        box-shadow: 0 0 28px rgba(227, 200, 121, 0.18);
+      }
+    }
+
+    @keyframes exclusivePulse {
+      0%, 100% {
+        transform: translateY(0);
+        box-shadow:
+          0 0 0 1px rgba(255, 255, 255, 0.08) inset,
+          0 0 18px rgba(227, 200, 121, 0.14);
+      }
+      50% {
+        transform: translateY(-1px);
+        box-shadow:
+          0 0 0 1px rgba(255, 255, 255, 0.12) inset,
+          0 0 30px rgba(227, 200, 121, 0.28);
+      }
+    }
+
+    @keyframes exclusiveSweep {
+      0%, 38% {
+        transform: skewX(-18deg) translateX(-180%);
+      }
+      68%, 100% {
+        transform: skewX(-18deg) translateX(520%);
+      }
+    }
+
+    @keyframes sigilDrift {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @keyframes sigilSpin {
+      to {
+        transform: rotate(-360deg);
+      }
+    }
+
+    @keyframes cardBackGlow {
+      0%, 100% {
+        background-position: 0% 50%;
+      }
+      50% {
+        background-position: 100% 50%;
+      }
+    }
+
+    @keyframes shuffleOrbit {
+      0%, 100% {
+        transform: translateY(0) rotateX(0deg) rotateY(0deg) rotateZ(0deg);
+      }
+      25% {
+        transform: translateY(-12px) rotateX(6deg) rotateY(-12deg) rotateZ(-4deg);
+      }
+      50% {
+        transform: translateY(4px) rotateX(-4deg) rotateY(12deg) rotateZ(5deg);
+      }
+      75% {
+        transform: translateY(-8px) rotateX(5deg) rotateY(8deg) rotateZ(-2deg);
+      }
+    }
+
+    @keyframes glyphWake {
+      from {
+        opacity: 0.25;
+        transform: scale(0.82) rotate(-8deg);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1) rotate(0deg);
+      }
+    }
+
+    @keyframes resultRise {
+      from {
+        opacity: 0;
+        transform: translateY(16px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes itemReveal {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes sparkBurst {
+      to {
+        opacity: 0;
+        transform: translate(calc(-50% + var(--spark-dx)), calc(-50% + var(--spark-dy))) scale(0.18);
+      }
+    }
+
+    @media (max-width: 900px) {
+      .shell {
+        width: min(100% - 24px, 720px);
+        padding-top: 12px;
+      }
+
+      .app-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .intro {
+        min-height: auto;
+      }
+
+      .control-bar {
+        grid-template-columns: 1fr;
+      }
+
+      .primary-button,
+      .secondary-button {
+        width: 100%;
+      }
+    }
+
+    @media (max-width: 680px) {
+      :root {
+        --card-w: min(43vw, 178px);
+      }
+
+      .shell {
+        width: min(100% - 18px, 560px);
+      }
+
+      .intro,
+      .reading-panel,
+      .result-panel {
+        border-radius: 8px;
+      }
+
+      .mode-switch {
+        grid-template-columns: 1fr;
+      }
+
+      .status-row {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .spread {
+        grid-template-columns: repeat(3, minmax(0, var(--card-w)));
+        gap: 8px;
+        min-height: 290px;
+      }
+
+      .spread.single {
+        grid-template-columns: minmax(0, min(66vw, 200px));
+      }
+
+      .card-front {
+        padding: 9px;
+      }
+
+      .card-meta {
+        font-size: 0.66rem;
+      }
+
+      .orientation {
+        font-size: 0.72rem;
+      }
+    }
+
+    @media (max-width: 430px) {
+      :root {
+        --card-w: min(25vw, 112px);
+      }
+
+      .lead {
+        font-size: 0.95rem;
+      }
+
+      .spread {
+        min-height: 226px;
+      }
+
+      .card-name {
+        font-size: 0.88rem;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 1ms !important;
+        scroll-behavior: auto !important;
+        transition-duration: 1ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="skyCanvas" class="sky-canvas" aria-hidden="true"></canvas>
+  <div class="cursor-aura" aria-hidden="true"></div>
+  <main class="shell">
+    <div class="app-grid">
+      <section class="intro" aria-labelledby="site-title">
+        <div>
+          <div class="brand-row">
+            <div class="brand-mark" aria-hidden="true">
+              <svg viewBox="0 0 64 64" role="img">
+                <circle cx="32" cy="32" r="23" fill="none" stroke="#e3c879" stroke-width="2"/>
+                <path d="M32 9 A18 18 0 1 0 32 55 A12 18 0 1 1 32 9" fill="none" stroke="#68d5c6" stroke-width="2"/>
+                <path d="M32 18 L35 29 L47 32 L35 35 L32 46 L29 35 L17 32 L29 29 Z" fill="#e3c879"/>
+              </svg>
+            </div>
+            <div class="brand-copy">
+              <div class="brand-headline">
+                <p class="brand-title">星幕塔罗</p>
+                <span class="exclusive-tag" aria-label="川川专用标签">川川专用</span>
+              </div>
+              <p class="brand-sub">Tarot for reflection</p>
+            </div>
+          </div>
+
+          <div style="margin-top: clamp(42px, 10vh, 96px);">
+            <h1 id="site-title">把一个问题交给今晚的牌面</h1>
+            <p class="lead">选择一种牌阵，静心洗牌。这里的解读更像一面镜子，帮你看见当下的情绪、阻力与下一步，而不是替你决定命运。</p>
+          </div>
+        </div>
+
+        <div>
+          <div class="mode-switch" role="tablist" aria-label="占卜模式">
+            <button class="mode-button" type="button" role="tab" aria-selected="true" data-mode="daily">每日一牌</button>
+            <button class="mode-button" type="button" role="tab" aria-selected="false" data-mode="three">三牌占卜</button>
+          </div>
+
+          <ul class="ritual-list" aria-label="占卜步骤" style="margin-top: 22px;">
+            <li><span>1</span><div>写下或默念一个开放式问题，例如「我今天需要留意什么？」</div></li>
+            <li><span>2</span><div>点击洗牌，等待牌面翻开，再阅读关键词与行动建议。</div></li>
+            <li><span>3</span><div>把解读当作自省线索，保留你的判断和选择权。</div></li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="reading-panel" aria-labelledby="reading-title">
+        <div class="control-bar">
+          <div class="field">
+            <label for="intention">你的问题或今日主题</label>
+            <input id="intention" maxlength="80" placeholder="例如：我该如何面对这段关系？">
+          </div>
+          <button id="drawButton" class="primary-button" type="button">洗牌并抽牌</button>
+          <button id="redrawButton" class="secondary-button" type="button">重新抽取</button>
+        </div>
+
+        <div class="status-row">
+          <span id="modeHint"><strong>每日一牌</strong> 会基于今天生成一张稳定牌面。</span>
+          <span id="deckHint">22 张大阿尔卡那</span>
+        </div>
+
+        <div id="spread" class="spread single" aria-live="polite"></div>
+
+        <section id="resultPanel" class="result-panel" hidden>
+          <h2>牌面解读</h2>
+          <p id="summaryCopy" class="summary-copy"></p>
+          <div id="readingList" class="reading-list"></div>
+        </section>
+
+        <p class="disclaimer">提示：塔罗解读仅用于自我观察、灵感整理与娱乐体验，不替代医疗、法律、财务或心理咨询等专业建议。</p>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const deck = [
+      {
+        id: "fool",
+        name: "愚者",
+        arcana: "大阿尔卡那 0",
+        keywords: ["开始", "信任", "自由"],
+        uprightMeaning: "新的道路正在打开。你不必一次看清全程，可以先允许自己轻装上路。",
+        reversedMeaning: "你可能急着跳进未知，也可能因为害怕犯错而停住。先确认边界，再迈出小步。",
+        advice: "把目标拆成今天能完成的一件事，让好奇心带你开始。"
+      },
+      {
+        id: "magician",
+        name: "魔术师",
+        arcana: "大阿尔卡那 I",
+        keywords: ["行动", "资源", "表达"],
+        uprightMeaning: "你拥有把想法落地的工具。关键不是等待条件完美，而是开始调动手边资源。",
+        reversedMeaning: "能量分散，或表达与真实意图不一致。回到核心目标，减少花哨动作。",
+        advice: "列出你已有的三项资源，并选一个马上使用。"
+      },
+      {
+        id: "high-priestess",
+        name: "女祭司",
+        arcana: "大阿尔卡那 II",
+        keywords: ["直觉", "沉默", "潜意识"],
+        uprightMeaning: "答案暂时不适合被催促。安静观察，你会从细节和身体感受里获得线索。",
+        reversedMeaning: "外界声音太响，让你忽略了自己的判断。你需要一点距离来听见内在。",
+        advice: "给自己十分钟不被打扰的时间，把真实感受写下来。"
+      },
+      {
+        id: "empress",
+        name: "皇后",
+        arcana: "大阿尔卡那 III",
+        keywords: ["滋养", "创造", "丰盛"],
+        uprightMeaning: "事情需要被温柔照料，而不是被强行推进。创造力来自安全感和持续投入。",
+        reversedMeaning: "你可能过度付出，或把照顾别人放在照顾自己之前。能量需要回流。",
+        advice: "为自己安排一件恢复性的事，再去回应外界需求。"
+      },
+      {
+        id: "emperor",
+        name: "皇帝",
+        arcana: "大阿尔卡那 IV",
+        keywords: ["结构", "责任", "边界"],
+        uprightMeaning: "清晰的规则会带来稳定。你需要为目标建立秩序，而不是只凭情绪推动。",
+        reversedMeaning: "控制感过强或边界松散都会让局面失衡。真正的力量来自稳定而非僵硬。",
+        advice: "写下一个明确边界，并用平静的方式表达。"
+      },
+      {
+        id: "hierophant",
+        name: "教皇",
+        arcana: "大阿尔卡那 V",
+        keywords: ["传统", "学习", "信念"],
+        uprightMeaning: "向成熟经验学习会减少试错。你可以寻找导师、方法论或可靠的规则。",
+        reversedMeaning: "某些旧规则已经不再适合你。尊重经验，也允许自己重新定义信念。",
+        advice: "分辨这是原则问题，还是只是习惯问题。"
+      },
+      {
+        id: "lovers",
+        name: "恋人",
+        arcana: "大阿尔卡那 VI",
+        keywords: ["选择", "关系", "一致"],
+        uprightMeaning: "关系或选择正在要求你诚实。真正重要的是内心价值与行动是否一致。",
+        reversedMeaning: "你可能为了避免冲突而牺牲真实需求。失衡不是失败，而是需要重新对齐。",
+        advice: "问自己：这个选择是否让我更接近真实的自己？"
+      },
+      {
+        id: "chariot",
+        name: "战车",
+        arcana: "大阿尔卡那 VII",
+        keywords: ["推进", "意志", "方向"],
+        uprightMeaning: "局势适合前进。只要方向明确，复杂情绪也能成为你的驱动力。",
+        reversedMeaning: "用力很多但方向不稳，容易在拉扯中消耗。先统一目标，再谈速度。",
+        advice: "为接下来 24 小时设定一个清楚的优先级。"
+      },
+      {
+        id: "strength",
+        name: "力量",
+        arcana: "大阿尔卡那 VIII",
+        keywords: ["勇气", "温柔", "自持"],
+        uprightMeaning: "真正的力量不是压制，而是温柔地驯服冲动。你有能力稳住当下。",
+        reversedMeaning: "你可能对自己太严厉，或把脆弱误认为软弱。请用更宽的心看待自己。",
+        advice: "把一句自责改写成一句支持自己的话。"
+      },
+      {
+        id: "hermit",
+        name: "隐者",
+        arcana: "大阿尔卡那 IX",
+        keywords: ["独处", "洞察", "内在灯火"],
+        uprightMeaning: "答案不在喧闹处。短暂退后，会让你看清真正值得追随的方向。",
+        reversedMeaning: "独处可能变成隔绝。你需要安静，也需要在合适的时候重新连接。",
+        advice: "暂停比较，专注回答：我真正想守护什么？"
+      },
+      {
+        id: "wheel",
+        name: "命运之轮",
+        arcana: "大阿尔卡那 X",
+        keywords: ["变化", "循环", "时机"],
+        uprightMeaning: "局面正在转动。变化不一定由你控制，但你可以选择如何回应它。",
+        reversedMeaning: "抗拒变化会放大不安。先承认周期的存在，再寻找能调整的部分。",
+        advice: "把注意力放在可行动的 20%，其余交给时间观察。"
+      },
+      {
+        id: "justice",
+        name: "正义",
+        arcana: "大阿尔卡那 XI",
+        keywords: ["公平", "判断", "因果"],
+        uprightMeaning: "事实和责任需要被看见。诚实评估，会让后续决定更稳。",
+        reversedMeaning: "你可能回避某个事实，或承担了不属于自己的责任。界线需要校准。",
+        advice: "分别写下事实、感受和猜测，避免混在一起。"
+      },
+      {
+        id: "hanged-man",
+        name: "倒吊人",
+        arcana: "大阿尔卡那 XII",
+        keywords: ["暂停", "换位", "臣服"],
+        uprightMeaning: "暂时停住不是倒退。换个角度看，你会发现新的理解方式。",
+        reversedMeaning: "你可能卡在无意义的等待里。暂停要服务于看清，而不是逃避行动。",
+        advice: "尝试用对方或未来自己的视角写一句解释。"
+      },
+      {
+        id: "death",
+        name: "死神",
+        arcana: "大阿尔卡那 XIII",
+        keywords: ["结束", "转化", "清理"],
+        uprightMeaning: "某个阶段正在自然结束。放下旧形式，是为了给新生命腾出空间。",
+        reversedMeaning: "你知道需要改变，却仍抓着熟悉的不适。温柔地完成告别。",
+        advice: "清理一个不再服务你的承诺、物品或习惯。"
+      },
+      {
+        id: "temperance",
+        name: "节制",
+        arcana: "大阿尔卡那 XIV",
+        keywords: ["调和", "耐心", "流动"],
+        uprightMeaning: "不同力量可以被慢慢调和。你不需要极端选择，可以寻找中间路径。",
+        reversedMeaning: "节奏失衡让你疲惫。过快或过慢都在提醒你重新校准。",
+        advice: "今天只调整一个小习惯，让生活回到可持续的节奏。"
+      },
+      {
+        id: "devil",
+        name: "恶魔",
+        arcana: "大阿尔卡那 XV",
+        keywords: ["束缚", "欲望", "觉察"],
+        uprightMeaning: "你正在看见某种依赖或执念。看见它，不代表被它定义。",
+        reversedMeaning: "松绑的机会出现了。只要愿意诚实面对，你就能夺回选择权。",
+        advice: "找出一个让你重复消耗的触发点，并设置一个实际限制。"
+      },
+      {
+        id: "tower",
+        name: "高塔",
+        arcana: "大阿尔卡那 XVI",
+        keywords: ["震动", "真相", "重建"],
+        uprightMeaning: "不稳固的结构可能被照亮。变化会带来冲击，也会清出真实地基。",
+        reversedMeaning: "你已经感到裂缝，却还在延后处理。越早面对，越容易温和重建。",
+        advice: "先处理一个最明显的小问题，不必一次推翻全部。"
+      },
+      {
+        id: "star",
+        name: "星星",
+        arcana: "大阿尔卡那 XVII",
+        keywords: ["希望", "疗愈", "愿景"],
+        uprightMeaning: "希望正在恢复。你可以用更长远的眼光看待当下，不必急着证明一切。",
+        reversedMeaning: "信心暂时变暗，但光并未消失。你需要真实的休息和可见的小进展。",
+        advice: "为未来写下一句温柔而具体的愿望。"
+      },
+      {
+        id: "moon",
+        name: "月亮",
+        arcana: "大阿尔卡那 XVIII",
+        keywords: ["迷雾", "梦境", "情绪"],
+        uprightMeaning: "信息还不完全清楚，情绪会放大想象。慢一点，别急着下最终判断。",
+        reversedMeaning: "迷雾正在散开。你开始分辨直觉和焦虑，这本身就是进展。",
+        advice: "在行动前确认一个事实来源，给情绪一点缓冲。"
+      },
+      {
+        id: "sun",
+        name: "太阳",
+        arcana: "大阿尔卡那 XIX",
+        keywords: ["清晰", "喜悦", "生命力"],
+        uprightMeaning: "事情变得明亮而直接。允许自己接受好消息，也把温暖分享出去。",
+        reversedMeaning: "快乐可能被压力遮住。你不需要等一切完美，才能享受片刻轻松。",
+        advice: "做一件能让身体和心情都变亮的小事。"
+      },
+      {
+        id: "judgement",
+        name: "审判",
+        arcana: "大阿尔卡那 XX",
+        keywords: ["召唤", "复盘", "更新"],
+        uprightMeaning: "旧经验正在召唤你做一次整合。你可以带着理解，进入新的阶段。",
+        reversedMeaning: "过度自责会阻碍更新。复盘是为了学习，不是为了惩罚自己。",
+        advice: "写下这段经历教会你的一个重要事实。"
+      },
+      {
+        id: "world",
+        name: "世界",
+        arcana: "大阿尔卡那 XXI",
+        keywords: ["完成", "整合", "展开"],
+        uprightMeaning: "一个阶段趋于完整。你可以庆祝成果，同时准备把经验带向更大的场域。",
+        reversedMeaning: "还差最后的收尾或确认。别急着开启下一章，先把当前章节关好。",
+        advice: "完成一个悬而未决的小收尾，让能量重新流动。"
+      }
+    ];
+
+    const positions = {
+      daily: ["今日指引"],
+      three: ["过去", "现在", "建议"]
+    };
+
+    const accents = [
+      "227, 200, 121", "104, 213, 198", "217, 133, 162", "154, 181, 255",
+      "238, 150, 113", "167, 226, 181", "205, 178, 255", "255, 212, 142"
+    ];
+
+    const state = {
+      mode: "daily",
+      isDrawing: false,
+      lastReading: []
+    };
+
+    const spreadEl = document.getElementById("spread");
+    const readingListEl = document.getElementById("readingList");
+    const resultPanelEl = document.getElementById("resultPanel");
+    const summaryCopyEl = document.getElementById("summaryCopy");
+    const drawButton = document.getElementById("drawButton");
+    const redrawButton = document.getElementById("redrawButton");
+    const modeHint = document.getElementById("modeHint");
+    const intentionInput = document.getElementById("intention");
+    const skyCanvas = document.getElementById("skyCanvas");
+    const auraEl = document.querySelector(".cursor-aura");
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+    function sleep(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    function initCursorAura() {
+      if (!auraEl || prefersReducedMotion.matches) return;
+
+      window.addEventListener("pointermove", (event) => {
+        document.body.classList.add("has-pointer");
+        document.documentElement.style.setProperty("--aura-x", `${event.clientX}px`);
+        document.documentElement.style.setProperty("--aura-y", `${event.clientY}px`);
+      }, { passive: true });
+
+      window.addEventListener("pointerleave", () => {
+        document.body.classList.remove("has-pointer");
+      });
+    }
+
+    function resetCardTilt(card) {
+      card.style.setProperty("--tilt-x", "0deg");
+      card.style.setProperty("--tilt-y", "0deg");
+      card.style.setProperty("--lift", "0px");
+    }
+
+    function initCardTilt() {
+      if (prefersReducedMotion.matches) return;
+
+      spreadEl.addEventListener("pointermove", (event) => {
+        if (window.innerWidth < 760) return;
+        const card = event.target.closest(".tarot-card");
+        if (!card || !spreadEl.contains(card)) return;
+
+        const rect = card.getBoundingClientRect();
+        const x = (event.clientX - rect.left) / rect.width - 0.5;
+        const y = (event.clientY - rect.top) / rect.height - 0.5;
+        card.style.setProperty("--tilt-x", `${(-y * 10).toFixed(2)}deg`);
+        card.style.setProperty("--tilt-y", `${(x * 12).toFixed(2)}deg`);
+        card.style.setProperty("--lift", "-10px");
+      }, { passive: true });
+
+      spreadEl.addEventListener("pointerout", (event) => {
+        const card = event.target.closest(".tarot-card");
+        if (card && !card.contains(event.relatedTarget)) {
+          resetCardTilt(card);
+        }
+      });
+
+      spreadEl.addEventListener("pointerleave", () => {
+        spreadEl.querySelectorAll(".tarot-card").forEach(resetCardTilt);
+      });
+    }
+
+    function initSkyCanvas() {
+      if (!skyCanvas || prefersReducedMotion.matches) return;
+      const context = skyCanvas.getContext("2d");
+      if (!context) return;
+
+      let stars = [];
+      let width = 0;
+      let height = 0;
+      const pointer = { x: 0, y: 0, active: false };
+
+      function resize() {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        width = window.innerWidth;
+        height = window.innerHeight;
+        skyCanvas.width = Math.floor(width * dpr);
+        skyCanvas.height = Math.floor(height * dpr);
+        context.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        const count = Math.min(118, Math.max(42, Math.floor((width * height) / 15000)));
+        stars = Array.from({ length: count }, (_, index) => ({
+          x: Math.random() * width,
+          y: Math.random() * height,
+          r: 0.7 + Math.random() * 1.8,
+          vx: (Math.random() - 0.5) * 0.12,
+          vy: 0.04 + Math.random() * 0.16,
+          phase: index * 0.37
+        }));
+      }
+
+      function drawLine(a, b, opacity) {
+        context.strokeStyle = `rgba(104, 213, 198, ${opacity})`;
+        context.lineWidth = 0.7;
+        context.beginPath();
+        context.moveTo(a.x, a.y);
+        context.lineTo(b.x, b.y);
+        context.stroke();
+      }
+
+      function tick(time) {
+        context.clearRect(0, 0, width, height);
+
+        const nebula = context.createRadialGradient(
+          width * 0.5,
+          height * 0.34,
+          0,
+          width * 0.5,
+          height * 0.34,
+          Math.max(width, height) * 0.72
+        );
+        nebula.addColorStop(0, "rgba(104, 213, 198, 0.045)");
+        nebula.addColorStop(0.48, "rgba(227, 200, 121, 0.024)");
+        nebula.addColorStop(1, "rgba(217, 133, 162, 0)");
+        context.fillStyle = nebula;
+        context.fillRect(0, 0, width, height);
+
+        for (let i = 0; i < stars.length; i += 1) {
+          const star = stars[i];
+          star.x += star.vx;
+          star.y += star.vy;
+
+          if (star.y > height + 20) star.y = -20;
+          if (star.x < -20) star.x = width + 20;
+          if (star.x > width + 20) star.x = -20;
+
+          const pulse = 0.45 + Math.sin(time * 0.0012 + star.phase) * 0.35;
+          context.fillStyle = `rgba(243, 234, 216, ${0.36 + pulse * 0.42})`;
+          context.beginPath();
+          context.arc(star.x, star.y, star.r, 0, Math.PI * 2);
+          context.fill();
+
+          for (let j = i + 1; j < stars.length; j += 1) {
+            const other = stars[j];
+            const distance = Math.hypot(star.x - other.x, star.y - other.y);
+            if (distance < 96) drawLine(star, other, (1 - distance / 96) * 0.12);
+          }
+
+          if (pointer.active) {
+            const pointerDistance = Math.hypot(star.x - pointer.x, star.y - pointer.y);
+            if (pointerDistance < 150) {
+              drawLine(star, pointer, (1 - pointerDistance / 150) * 0.28);
+            }
+          }
+        }
+
+        requestAnimationFrame(tick);
+      }
+
+      window.addEventListener("resize", resize, { passive: true });
+      window.addEventListener("pointermove", (event) => {
+        pointer.x = event.clientX;
+        pointer.y = event.clientY;
+        pointer.active = true;
+      }, { passive: true });
+      window.addEventListener("pointerleave", () => {
+        pointer.active = false;
+      });
+
+      resize();
+      requestAnimationFrame(tick);
+    }
+
+    function createSparkBurst(card, deckIndex) {
+      if (prefersReducedMotion.matches) return;
+      const rect = card.getBoundingClientRect();
+      const x = rect.left + rect.width / 2;
+      const y = rect.top + rect.height / 2;
+      const accent = accents[deckIndex % accents.length];
+      const total = window.innerWidth < 680 ? 12 : 20;
+
+      for (let i = 0; i < total; i += 1) {
+        const spark = document.createElement("span");
+        const angle = (Math.PI * 2 * i) / total + Math.random() * 0.35;
+        const distance = 44 + Math.random() * 70;
+        const size = 3 + Math.random() * 5;
+        spark.className = "spark";
+        spark.style.setProperty("--spark-x", `${x}px`);
+        spark.style.setProperty("--spark-y", `${y}px`);
+        spark.style.setProperty("--spark-rgb", accent);
+        spark.style.setProperty("--spark-size", `${size}px`);
+        spark.style.setProperty("--spark-dx", `${Math.cos(angle) * distance}px`);
+        spark.style.setProperty("--spark-dy", `${Math.sin(angle) * distance}px`);
+        document.body.appendChild(spark);
+        window.setTimeout(() => spark.remove(), 900);
+      }
+    }
+
+    function hashString(value) {
+      let hash = 2166136261;
+      for (let i = 0; i < value.length; i += 1) {
+        hash ^= value.charCodeAt(i);
+        hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+      }
+      return hash >>> 0;
+    }
+
+    function getDateKey() {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, "0");
+      const day = String(now.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    }
+
+    function randomInt(max) {
+      if (window.crypto && window.crypto.getRandomValues) {
+        const array = new Uint32Array(1);
+        window.crypto.getRandomValues(array);
+        return array[0] % max;
+      }
+      return Math.floor(Math.random() * max);
+    }
+
+    function getReading(forceRandom = false) {
+      const count = state.mode === "daily" ? 1 : 3;
+      const pool = [...deck];
+      const reading = [];
+
+      if (state.mode === "daily" && !forceRandom) {
+        const seed = hashString(`daily-${getDateKey()}`);
+        const cardIndex = seed % deck.length;
+        const reversed = hashString(`orientation-${getDateKey()}`) % 2 === 0;
+        return [{ card: deck[cardIndex], reversed, position: positions.daily[0], deckIndex: cardIndex }];
+      }
+
+      for (let i = 0; i < count; i += 1) {
+        const poolIndex = randomInt(pool.length);
+        const card = pool.splice(poolIndex, 1)[0];
+        reading.push({
+          card,
+          reversed: randomInt(2) === 0,
+          position: positions[state.mode][i],
+          deckIndex: deck.findIndex((item) => item.id === card.id)
+        });
+      }
+
+      return reading;
+    }
+
+    function cardSymbolSvg(index, accent) {
+      const ring = 22 + (index % 4) * 3;
+      const tilt = (index * 17) % 90;
+      const small = 7 + (index % 5);
+      const pathShift = 11 + (index % 7);
+
+      return `
+        <svg viewBox="0 0 120 120" aria-hidden="true">
+          <defs>
+            <radialGradient id="glow-${index}" cx="50%" cy="45%" r="55%">
+              <stop offset="0%" stop-color="rgba(${accent}, 0.86)"/>
+              <stop offset="72%" stop-color="rgba(${accent}, 0.10)"/>
+              <stop offset="100%" stop-color="rgba(${accent}, 0)"/>
+            </radialGradient>
+          </defs>
+          <circle cx="60" cy="60" r="46" fill="url(#glow-${index})"/>
+          <circle cx="60" cy="60" r="${ring}" fill="none" stroke="rgba(29, 26, 25, 0.62)" stroke-width="1.5"/>
+          <circle cx="60" cy="60" r="42" fill="none" stroke="rgba(${accent}, 0.9)" stroke-width="2"/>
+          <path d="M60 18 L68 ${52 - pathShift / 3} L102 60 L68 ${68 + pathShift / 3} L60 102 L52 ${68 + pathShift / 3} L18 60 L52 ${52 - pathShift / 3} Z" fill="none" stroke="rgba(29, 26, 25, 0.7)" stroke-width="1.8"/>
+          <g transform="rotate(${tilt} 60 60)">
+            <path d="M60 ${28 - small / 2} C82 40 82 80 60 ${92 + small / 2} C38 80 38 40 60 ${28 - small / 2}Z" fill="none" stroke="rgba(29, 26, 25, 0.64)" stroke-width="1.6"/>
+            <line x1="60" y1="20" x2="60" y2="100" stroke="rgba(${accent}, 0.94)" stroke-width="2"/>
+            <line x1="20" y1="60" x2="100" y2="60" stroke="rgba(${accent}, 0.64)" stroke-width="1.5"/>
+          </g>
+          <circle cx="60" cy="60" r="${small}" fill="rgba(29, 26, 25, 0.78)"/>
+        </svg>
+      `;
+    }
+
+    function renderSpread(reading = []) {
+      const labels = positions[state.mode];
+      spreadEl.className = `spread${state.mode === "daily" ? " single" : ""}`;
+      spreadEl.innerHTML = labels.map((label, index) => {
+        const item = reading[index];
+        const card = item?.card;
+        const accent = accents[(item?.deckIndex ?? index) % accents.length];
+        const style = `--accent-rgb: ${accent}`;
+        const front = card ? `
+          <div class="card-face card-front ${item.reversed ? "reversed" : ""}" style="${style}">
+            <div class="card-meta"><span>${card.arcana}</span><span>${String(item.deckIndex).padStart(2, "0")}</span></div>
+            <div class="card-art">${cardSymbolSvg(item.deckIndex, accent)}</div>
+            <div>
+              <h3 class="card-name">${card.name}</h3>
+              <div class="orientation">${item.reversed ? "逆位" : "正位"}</div>
+            </div>
+          </div>
+        ` : `
+          <div class="card-face card-front" style="${style}">
+            <div class="card-meta"><span>星幕</span><span>?</span></div>
+            <div class="card-art">${cardSymbolSvg(index, accent)}</div>
+            <div>
+              <h3 class="card-name">等待抽牌</h3>
+              <div class="orientation">未翻开</div>
+            </div>
+          </div>
+        `;
+
+        return `
+          <article class="card-slot">
+            <div class="slot-label">${label}</div>
+            <div class="tarot-card ${card ? "is-dealing" : ""}" data-card-index="${index}">
+              <div class="card-face card-back">
+                <div class="back-sigil"></div>
+              </div>
+              ${front}
+            </div>
+          </article>
+        `;
+      }).join("");
+    }
+
+    function renderResult(reading) {
+      const topic = intentionInput.value.trim() || (state.mode === "daily" ? "今天的状态" : "这个问题");
+      const names = reading.map((item) => `${item.card.name}${item.reversed ? "逆位" : "正位"}`).join("、");
+      summaryCopyEl.textContent = state.mode === "daily"
+        ? `围绕「${topic}」，今天出现的是 ${names}。它提醒你先照顾内在状态，再决定下一步。`
+        : `围绕「${topic}」，这组三牌从来处、当下和建议三个角度展开。请把它们当作线索，而不是结论。`;
+
+      readingListEl.innerHTML = reading.map((item) => {
+        const meaning = item.reversed ? item.card.reversedMeaning : item.card.uprightMeaning;
+        return `
+          <article class="reading-item">
+            <h3><span>${item.position}</span><span class="badge">${item.card.name} · ${item.reversed ? "逆位" : "正位"}</span></h3>
+            <p class="keywords">${item.card.keywords.join(" / ")}</p>
+            <p>${meaning}</p>
+            <p><strong>行动建议：</strong>${item.card.advice}</p>
+          </article>
+        `;
+      }).join("");
+
+      resultPanelEl.hidden = false;
+    }
+
+    function setMode(mode) {
+      state.mode = mode;
+      document.querySelectorAll(".mode-button").forEach((button) => {
+        button.setAttribute("aria-selected", String(button.dataset.mode === mode));
+      });
+      modeHint.innerHTML = mode === "daily"
+        ? "<strong>每日一牌</strong> 会基于今天生成一张稳定牌面。"
+        : "<strong>三牌占卜</strong> 会抽出不重复的过去、现在、建议。";
+      resultPanelEl.hidden = true;
+      resultPanelEl.classList.remove("is-visible");
+      state.lastReading = [];
+      renderSpread();
+    }
+
+    async function drawCards(forceRandom = false) {
+      if (state.isDrawing) return;
+      state.isDrawing = true;
+      drawButton.disabled = true;
+      redrawButton.disabled = true;
+      resultPanelEl.hidden = true;
+      resultPanelEl.classList.remove("is-visible");
+      document.body.classList.add("is-ritual");
+      drawButton.classList.add("is-casting");
+      drawButton.textContent = "星幕洗牌中...";
+
+      renderSpread();
+      spreadEl.classList.add("is-shuffling");
+      spreadEl.querySelectorAll(".tarot-card").forEach((card, index) => {
+        card.style.setProperty("--shuffle-index", index);
+      });
+
+      await sleep(prefersReducedMotion.matches ? 120 : 820);
+      const reading = getReading(forceRandom);
+      state.lastReading = reading;
+      renderSpread(reading);
+      spreadEl.classList.remove("is-shuffling");
+
+      const cards = [...spreadEl.querySelectorAll(".tarot-card")];
+      cards.forEach((card) => card.classList.remove("is-revealed"));
+
+      await sleep(prefersReducedMotion.matches ? 40 : 320);
+      cards.forEach((card) => card.classList.remove("is-dealing"));
+      for (let i = 0; i < cards.length; i += 1) {
+        await sleep(prefersReducedMotion.matches ? 40 : 300);
+        cards[i].classList.add("is-revealed");
+        createSparkBurst(cards[i], reading[i].deckIndex);
+      }
+
+      await sleep(prefersReducedMotion.matches ? 80 : 380);
+      renderResult(reading);
+      resultPanelEl.classList.add("is-visible");
+      drawButton.textContent = "洗牌并抽牌";
+      drawButton.classList.remove("is-casting");
+      document.body.classList.remove("is-ritual");
+      drawButton.disabled = false;
+      redrawButton.disabled = false;
+      state.isDrawing = false;
+    }
+
+    document.querySelectorAll(".mode-button").forEach((button) => {
+      button.addEventListener("click", () => setMode(button.dataset.mode));
+    });
+
+    drawButton.addEventListener("click", () => drawCards(false));
+    redrawButton.addEventListener("click", () => drawCards(true));
+
+    initCursorAura();
+    initSkyCanvas();
+    initCardTilt();
+    renderSpread();
+  </script>
+</body>
+</html>

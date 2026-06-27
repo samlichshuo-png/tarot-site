@@ -327,7 +327,7 @@
 
     .control-bar {
       display: grid;
-      grid-template-columns: 1fr auto auto;
+      grid-template-columns: 1fr auto;
       gap: 10px;
       align-items: end;
     }
@@ -481,11 +481,18 @@
       position: relative;
       width: var(--card-w);
       aspect-ratio: 2 / 3;
+      cursor: pointer;
       transform-style: preserve-3d;
       transform: translateY(var(--lift)) rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
       transition: transform 760ms cubic-bezier(0.2, 0.7, 0.2, 1), filter 240ms ease;
       filter: drop-shadow(0 24px 34px rgba(0, 0, 0, 0.34));
       will-change: transform, filter;
+    }
+
+    .tarot-card:focus-visible {
+      outline: 2px solid var(--teal);
+      outline-offset: 6px;
+      border-radius: 8px;
     }
 
     .tarot-card:hover {
@@ -1031,7 +1038,7 @@
 
           <ul class="ritual-list" aria-label="占卜步骤" style="margin-top: 22px;">
             <li><span>1</span><div>写下或默念一个开放式问题，例如「我今天需要留意什么？」</div></li>
-            <li><span>2</span><div>点击洗牌，等待牌面翻开，再阅读关键词与行动建议。</div></li>
+            <li><span>2</span><div>点击洗牌让牌组流动，然后点选牌面抽取指引。</div></li>
             <li><span>3</span><div>把解读当作自省线索，保留你的判断和选择权。</div></li>
           </ul>
         </div>
@@ -1043,12 +1050,11 @@
             <label for="intention">你的问题或今日主题</label>
             <input id="intention" maxlength="80" placeholder="例如：我该如何面对这段关系？">
           </div>
-          <button id="drawButton" class="primary-button" type="button">洗牌并抽牌</button>
-          <button id="redrawButton" class="secondary-button" type="button">重新抽取</button>
+          <button id="drawButton" class="primary-button" type="button">洗牌</button>
         </div>
 
         <div class="status-row">
-          <span id="modeHint"><strong>每日一牌</strong> 会基于今天生成一张稳定牌面。</span>
+          <span id="modeHint"><strong>每日一牌</strong> 洗牌后点击牌面抽取今日指引。</span>
           <span id="deckHint">22 张大阿尔卡那</span>
         </div>
 
@@ -1288,7 +1294,6 @@
     const resultPanelEl = document.getElementById("resultPanel");
     const summaryCopyEl = document.getElementById("summaryCopy");
     const drawButton = document.getElementById("drawButton");
-    const redrawButton = document.getElementById("redrawButton");
     const modeHint = document.getElementById("modeHint");
     const intentionInput = document.getElementById("intention");
     const skyCanvas = document.getElementById("skyCanvas");
@@ -1585,7 +1590,7 @@
         return `
           <article class="card-slot">
             <div class="slot-label">${label}</div>
-            <div class="tarot-card ${card ? "is-dealing" : ""}" data-card-index="${index}">
+            <div class="tarot-card ${card ? "is-dealing" : ""}" data-card-index="${index}" role="button" tabindex="0" aria-label="点击抽取${label}">
               <div class="card-face card-back">
                 <div class="back-sigil"></div>
               </div>
@@ -1624,24 +1629,49 @@
         button.setAttribute("aria-selected", String(button.dataset.mode === mode));
       });
       modeHint.innerHTML = mode === "daily"
-        ? "<strong>每日一牌</strong> 会基于今天生成一张稳定牌面。"
-        : "<strong>三牌占卜</strong> 会抽出不重复的过去、现在、建议。";
+        ? "<strong>每日一牌</strong> 洗牌后点击牌面抽取今日指引。"
+        : "<strong>三牌占卜</strong> 洗牌后点击任意牌面抽取三张不重复的牌。";
       resultPanelEl.hidden = true;
       resultPanelEl.classList.remove("is-visible");
       state.lastReading = [];
       renderSpread();
     }
 
+    async function shuffleCards() {
+      if (state.isDrawing) return;
+      state.isDrawing = true;
+      drawButton.disabled = true;
+      resultPanelEl.hidden = true;
+      resultPanelEl.classList.remove("is-visible");
+      state.lastReading = [];
+      document.body.classList.add("is-ritual");
+      drawButton.classList.add("is-casting");
+      drawButton.textContent = "洗牌中...";
+
+      renderSpread();
+      spreadEl.classList.add("is-shuffling");
+      spreadEl.querySelectorAll(".tarot-card").forEach((card, index) => {
+        card.style.setProperty("--shuffle-index", index);
+      });
+
+      await sleep(prefersReducedMotion.matches ? 120 : 820);
+      spreadEl.classList.remove("is-shuffling");
+      drawButton.textContent = "洗牌";
+      drawButton.classList.remove("is-casting");
+      document.body.classList.remove("is-ritual");
+      drawButton.disabled = false;
+      state.isDrawing = false;
+    }
+
     async function drawCards(forceRandom = false) {
       if (state.isDrawing) return;
       state.isDrawing = true;
       drawButton.disabled = true;
-      redrawButton.disabled = true;
       resultPanelEl.hidden = true;
       resultPanelEl.classList.remove("is-visible");
       document.body.classList.add("is-ritual");
       drawButton.classList.add("is-casting");
-      drawButton.textContent = "星幕洗牌中...";
+      drawButton.textContent = "抽取中...";
 
       renderSpread();
       spreadEl.classList.add("is-shuffling");
@@ -1669,11 +1699,10 @@
       await sleep(prefersReducedMotion.matches ? 80 : 380);
       renderResult(reading);
       resultPanelEl.classList.add("is-visible");
-      drawButton.textContent = "洗牌并抽牌";
+      drawButton.textContent = "洗牌";
       drawButton.classList.remove("is-casting");
       document.body.classList.remove("is-ritual");
       drawButton.disabled = false;
-      redrawButton.disabled = false;
       state.isDrawing = false;
     }
 
@@ -1681,8 +1710,21 @@
       button.addEventListener("click", () => setMode(button.dataset.mode));
     });
 
-    drawButton.addEventListener("click", () => drawCards(false));
-    redrawButton.addEventListener("click", () => drawCards(true));
+    drawButton.addEventListener("click", () => shuffleCards());
+    spreadEl.addEventListener("click", (event) => {
+      const card = event.target.closest(".tarot-card");
+      if (card && spreadEl.contains(card)) {
+        drawCards(state.lastReading.length > 0);
+      }
+    });
+    spreadEl.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      const card = event.target.closest(".tarot-card");
+      if (card && spreadEl.contains(card)) {
+        event.preventDefault();
+        drawCards(state.lastReading.length > 0);
+      }
+    });
 
     initCursorAura();
     initSkyCanvas();
